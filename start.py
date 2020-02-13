@@ -11,7 +11,7 @@ def str_split(str):
         return d[0]
 def conver_to_file(fn,dict):
     with open('fn','w+') as fd:
-        fd.write(json.dumps(dict)
+        fd.write(json.dumps(dict))
     print('Success Write File:',fn)
 
 
@@ -70,6 +70,5 @@ if input('Do you want to choose a date? (Y/N):').lower() == 'y':
                 sort_by_ip[client_ip_s][proxy_address_s]+=1
             else:
                 sort_by_ip[client_ip_s].update({proxy_address_s:1})
-   print('Done for sort process')
-   print('starting second sort..')
-   
+    print('Done for sort process')
+    print('starting second sort..')   
