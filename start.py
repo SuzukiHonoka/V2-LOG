@@ -15,6 +15,11 @@ socks5_server = '192.168.31.1:10808'
 log_file_path = 'access.log'
 #ip info cache file path
 ip_info_cache_path = 'ips.info'
+#note: ips bft is used with ads.
+#ips bft
+ips_bft_path = 'ips.bft'
+ips_bft = {}
+ips_bft_changed = False
 #ads status path
 ads_status_path = 'ads.status'
 #level1: ads floor
@@ -28,10 +33,12 @@ ads_state['unknown'] = ['200','301','404','403']
 ips_sd = ['country_name','region_name','city']
 #temp store the ips info to mem
 ips_info_cache = {}
+ips_info_cache_changed = False
 #store the datas after_sort_process1
 line_data_sort_by_date = {}
-#adds status
+#adds status (Main Dict)
 ads_status = {}
+ads_changed = False
 #store the source file all lines as a list format
 per_line_data = []
 #IP lookup API key
@@ -80,7 +87,7 @@ def conver_to_file(fn,dict):
     print('Success Write File:',fn)
 
 #ip:str/list
-def get_ip_info(ip):
+def get_ip_info_api(ip):
     print('Get Info for IP:',ip)
     ips_format = ''
     if type(ip) == list:
@@ -106,7 +113,7 @@ def list_dif(li1,li2):
     return li_fae
 
 #simple write/read
-def rw(path,mode,data=None):
+def rw(path,mode='r',data=None):
     r = 'r'
     w = 'w'
     if mode == r:
@@ -132,44 +139,47 @@ def get_value_self_check():
 #temp ip info cache
 
 def update_ip_info_cache(l_ips_info):
-    global ips_info_cache
+    global ips_info_cache,ips_info_cache_changed
     if not path_exists(ip_info_cache_path):
-        rw(ip_info_cache_path,'w',json_dumps(l_ips_info))
-       # with open(ip_info_cache_path,'w') as fd:
+        ips_info_cache = l_ips_info
+        rw(ip_info_cache_path,'w',json_dumps(ips_info_cache))
+        # with open(ip_info_cache_path,'w') as fd:
       #      fd.write(json_dumps(l_ips_info))
         print('IPS Created.')
     else:
+        print(l_ips_info == ips_info_cache)
+
         res = rw(ip_info_cache_path,'r')
         l_ips = list(l_ips_info.keys())
         o_ips = list(ips_info_cache.keys())
         d_ips = list_dif(o_ips,l_ips)
-        print(o_ips,l_ips)
         if len(d_ips) != 0:
+            ips_info_cache_changed = True
             print('Add IPS List:',d_ips)
             for un_met in d_ips:
                 ips_info_cache[un_met] = l_ips_info[un_met]
-                rw(ip_info_cache_path,'w',json_dumps(ips_info_cache))
                 print('IPS Updated')
         else:
             print('IPS is up to date')
 
-def get_ip_info(ip,p):
+def get_ip_info(ip,p=None):
+    global ips_info_cache
     if not ip in ips_info_cache:
-        print('IP NOT IN IPS:' + ip)
-        ips_info[ip] = get_ip_info(ip)
+        print('IP NOT IN IPS:',ip)
+        ips_info[ip] = get_ip_info_api(ip)
+
         update_ip_info_cache(ips_info)
-        #return 'IP NOT IN IPS:' + ip
     if type(p) == list:
         f_d = ''
         for pp in p:
             f_d += ips_info_cache[ip][pp] + ' '
         return f_d
-    else:
+    elif type(p) == str:
         return ips_info_cache[ip][p] 
 
-def get_ads_status(ad,mode):
+def get_ads_status(ad):
     global ads_status
-    if not ad in ads_status:
+    if not ad in ips_bft:
         print('Unmet Address:',ad)
         if yn('Did you want to manual add it to ADS?'):
             print('Address:',ad,'belongs to which floor?')
@@ -177,7 +187,36 @@ def get_ads_status(ad,mode):
             np_list_index(ads_floor)
             belongs = ads_floor[int(input('index:'))-1]
             print('Which state it is?')
-            np_list_index()
+            np_list_index(ads_state[belongs])
+            state = ads_state[belongs][int(input('Index:'))-1]
+            note = input('Leave a note:')
+            print(ad,'Belongs to:',belongs,'state:',state,'note:',note)
+            if yn('Do you confirm these changes?'):
+                ads_status[belongs][state].update({ad,note})
+            ads_changed = True
+            ips_bft[ad]=[belongs,state]
+            ips_bft_changed = True
+            print('Changes saved.')
+    else:
+        belongs = ips_bft[ad][0]
+        state = ips_bft[ad][1]
+        note = ads_status[belongs][state][ad]
+        print(ad,'Belongs to:',belongs,'state:',state,'note:',note)
+
+
+
+def auto_save():
+    if ips_info_cache_changed:
+        rw(ip_info_cache_path,'w',json_dumps(ips_info_cache))
+        print('Auto saved:',ip_info_cache_path)
+    if ads_changed:
+        rw(ads_status_path,'w',json_dumps(ads_status))
+        print('Auto saved:',ads_status_path)
+    if ips_bft_changed:
+        rw(ips_bft_path,'w',json_dumps(ips_bft))
+        print('Auto saved:',ips_bft_path)
+    pass
+                
 
 #init
 
@@ -191,7 +230,6 @@ def setup_ip_info_cache():
             print('IPS Stored:',len(ips_info_cache.keys()))
         else:
             print('Empty IPS.')
-
 def setup_ads_status():
     global ads_status
     if path_exists(ads_status_path):
@@ -208,6 +246,12 @@ def setup_ads_status():
                 ads_status[floor][per_s] = {}
         rw(ads_status_path,'w',json_dumps(ads_status))
 
+def setup_ips_bft():
+    global ips_bft
+    if path_exists(ips_bft_path):
+        ips_bft = rw(ips_bft_path,'r')
+
+setup_ips_bft()
 
 setup_ads_status()
 
@@ -286,10 +330,15 @@ if yn('Do you want to choose a date?'):
     print('----------IPS GEO LIST----------')
     for per_ip in client_ip:
         print(per_ip,get_ip_info(per_ip,ips_sd))
+        auto_save()
     print('----------IPS GEO LIST----------')
     print('----------ADS CHECK PS----------')
-    #for per_ad in proxy_address:
+    for per_ad in proxy_address:
+        get_ads_status(per_ad)
+        exit()
 
-    
+
+
+auto_save()  
         
 #print(get_ip_info('1.1.1.1'))
