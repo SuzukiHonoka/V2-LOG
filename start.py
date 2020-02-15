@@ -141,14 +141,13 @@ def get_value_self_check():
 def update_ip_info_cache(l_ips_info):
     global ips_info_cache,ips_info_cache_changed
     if not path_exists(ip_info_cache_path):
-        ips_info_cache = l_ips_info
-        rw(ip_info_cache_path,'w',json_dumps(ips_info_cache))
+        #ips_info_cache = l_ips_info
+        rw(ip_info_cache_path,'w',json_dumps(l_ips_info))
         # with open(ip_info_cache_path,'w') as fd:
       #      fd.write(json_dumps(l_ips_info))
+        ips_info_cache = json_loads(rw(ip_info_cache_path,'r'))
         print('IPS Created.')
     else:
-        print(l_ips_info == ips_info_cache)
-
         res = rw(ip_info_cache_path,'r')
         l_ips = list(l_ips_info.keys())
         o_ips = list(ips_info_cache.keys())
