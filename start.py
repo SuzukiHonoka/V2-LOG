@@ -9,14 +9,29 @@ from urllib import request
 #path_exists used for check if path exist
 from os.path import exists as path_exists
 
+#socks5 proxy
+socks5_server = '192.168.31.1:10808'
 #log file path
 log_file_path = 'access.log'
 #ip info cache file path
 ip_info_cache_path = 'ips.info'
+#ads status path
+ads_status_path = 'ads.status'
+#level1: ads floor
+ads_floor = ['normal','abnormal','unknown']
+#level2: ads type
+ads_state = {}
+ads_state['normal'] = ['VIDEO','SNS','IT','GAME']
+ads_state['abnormal'] = ['SEX','BLACK_LIST']
+ads_state['unknown'] = ['200','301','404','403']
+#sd.format
+ips_sd = ['country_name','region_name','city']
 #temp store the ips info to mem
 ips_info_cache = {}
 #store the datas after_sort_process1
 line_data_sort_by_date = {}
+#adds status
+ads_status = {}
 #store the source file all lines as a list format
 per_line_data = []
 #IP lookup API key
@@ -47,6 +62,14 @@ def str_split(str):
     else:
         return d[0]
 
+def np_list_index(np_list):
+    for i in range(len(np_list)):
+        print('[' + str(i + 1) + '] ' + np_list[i])
+
+
+def yn(str):
+    return input(str + ' (Y/N):').lower() == 'y'
+
 #sometimes we need to save the result to a file
 #for prevent twice operation like reload logs
 
@@ -64,8 +87,8 @@ def get_ip_info(ip):
         for per_ip in ip:
             ips_format += ',' + per_ip
     else:
-        ips_format = ip
-        
+        ips_format = ip 
+
     r_url = ipstack_api + ips_format + ipstack_str1 + ipstack_key + ipstack_str2
     r = request.urlopen(r_url)
     if r.getcode() == 200:
@@ -96,6 +119,16 @@ def rw(path,mode,data=None):
             fd.write(data)
             print('Written:',path)
 
+#self_check if the site OK or NOT
+
+def self_check():
+    pass
+
+def get_value_self_check():
+    pass
+
+
+
 #temp ip info cache
 
 def update_ip_info_cache(l_ips_info):
@@ -120,20 +153,72 @@ def update_ip_info_cache(l_ips_info):
         else:
             print('IPS is up to date')
 
+def get_ip_info(ip,p):
+    if not ip in ips_info_cache:
+        print('IP NOT IN IPS:' + ip)
+        ips_info[ip] = get_ip_info(ip)
+        update_ip_info_cache(ips_info)
+        #return 'IP NOT IN IPS:' + ip
+    if type(p) == list:
+        f_d = ''
+        for pp in p:
+            f_d += ips_info_cache[ip][pp] + ' '
+        return f_d
+    else:
+        return ips_info_cache[ip][p] 
+
+def get_ads_status(ad,mode):
+    global ads_status
+    if not ad in ads_status:
+        print('Unmet Address:',ad)
+        if yn('Did you want to manual add it to ADS?'):
+            print('Address:',ad,'belongs to which floor?')
+            print('ALL Floor:')
+            np_list_index(ads_floor)
+            belongs = ads_floor[int(input('index:'))-1]
+            print('Which state it is?')
+            np_list_index()
+
+#init
+
 def setup_ip_info_cache():
     global ips_info_cache
     if path_exists(ip_info_cache_path):
-        print('Starting to read old IPS')
+        print('Starting to load IPS..')
         res = rw(ip_info_cache_path,'r')
         if len(res) != 0:
             ips_info_cache = json_loads(res)
-            print('IPS:',list(ips_info_cache.keys()))
+            print('IPS Stored:',len(ips_info_cache.keys()))
+        else:
+            print('Empty IPS.')
+
+def setup_ads_status():
+    global ads_status
+    if path_exists(ads_status_path):
+        print('Starting to load ADS..')
+        res = rw(ads_status_path,'r')
+        if len(res) != 0:
+            ads_status = json_loads(res)
+    else:
+        print('Initing ADS..')
+        #ads_status = {}
+        for floor in ads_floor:
+            ads_status[floor] = {}
+            for per_s in ads_state[floor]:
+                ads_status[floor][per_s] = {}
+        rw(ads_status_path,'w',json_dumps(ads_status))
+
+
+setup_ads_status()
+
 setup_ip_info_cache()
+
+
 with open(log_file_path,'r') as fd:
     per_line_data = fd.readlines()
     total_line = len(per_line_data)
     #for test we reset the line value to 10000
-    total_line = 10000
+    #total_line = 10000
     last_date = ''
     time_start_read = get_time()
     print('Starting read line process')
@@ -162,12 +247,15 @@ with open(log_file_path,'r') as fd:
     print('Total read line:',total_line)
     print('Total cost:',get_time() - time_start_read,'for read',total_line,'lines')
 date_keys = list(line_data_sort_by_date.keys())
-print('Found available keys:',date_keys)
+print('Found available keys:')
+np_list_index(date_keys)
+#Var for save a data which sort by ip in dict format
 sort_by_ip = {}
-if input('Do you want to choose a date? (Y/N):').lower() == 'y':
+if yn('Do you want to choose a date?'):
     choose = int(input('Enter the key index:'))
-    lines_range = line_data_sort_by_date[date_keys[choose - 1]]
-    print(lines_range)
+    target_date = date_keys[choose - 1]
+    lines_range = line_data_sort_by_date[target_date]
+    print('Date',target_date,'Lines range:',lines_range)
     start_index = lines_range[0] - 1
     end_index = lines_range[1]
     lines_target = per_line_data[start_index:end_index]
@@ -188,13 +276,20 @@ if input('Do you want to choose a date? (Y/N):').lower() == 'y':
     print('starting second sort..')
     proxy_address = []
     client_ip = list(sort_by_ip.keys())
-
+    proxy_address = []
+    for ip in client_ip:
+        adds = sort_by_ip[ip]
+        proxy_address.extend(list(adds.keys()))
+    adds_status = {}
     ips_info = {}
+    print('At this day these IP below have accessed your server.')
+    print('----------IPS GEO LIST----------')
     for per_ip in client_ip:
-        if per_ip in ips_info_cache:
-            print('IP included in IPS:',per_ip)
-            continue
-        ips_info[per_ip] = get_ip_info(per_ip)
-        update_ip_info_cache(ips_info)
+        print(per_ip,get_ip_info(per_ip,ips_sd))
+    print('----------IPS GEO LIST----------')
+    print('----------ADS CHECK PS----------')
+    #for per_ad in proxy_address:
+
+    
         
 #print(get_ip_info('1.1.1.1'))
