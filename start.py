@@ -191,7 +191,7 @@ def get_ads_status(ad):
             note = input('Leave a note:')
             print(ad,'Belongs to:',belongs,'state:',state,'note:',note)
             if yn('Do you confirm these changes?'):
-                ads_status[belongs][state].update({ad,note})
+                ads_status[belongs][state][ad] = note
             ads_changed = True
             ips_bft[ad]=[belongs,state]
             ips_bft_changed = True
@@ -326,15 +326,16 @@ if yn('Do you want to choose a date?'):
     adds_status = {}
     ips_info = {}
     print('At this day these IP below have accessed your server.')
+    print('Total IPS:',len(client_ip))
     print('----------IPS GEO LIST----------')
     for per_ip in client_ip:
         print(per_ip,get_ip_info(per_ip,ips_sd))
         auto_save()
     print('----------IPS GEO LIST----------')
+    print('Total ADS:',len(proxy_address))
     print('----------ADS CHECK PS----------')
     for per_ad in proxy_address:
         get_ads_status(per_ad)
-        exit()
 
 
 
